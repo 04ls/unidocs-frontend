@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent } from 'react';
 import type { User } from '../types/User';
 import type { Document } from '../types/Document'
+import DocumentsSection from '../components/DocumentsSection';
 
 interface DashboardProps {
   user: User;
@@ -201,7 +202,10 @@ function Dashboard({
             )}
 
             {activeSection === 'documentos' && (
-              <DocumentsSection documents={documents} />
+              <DocumentsSection 
+              user={user}
+              documents={documents}
+              />
             )}
 
             {activeSection === 'crear' && documentStep === 'selection' && (
@@ -378,35 +382,6 @@ function UserDashboard() {
   );
 }
 
-function DocumentsSection(){
-  return(
-    <section className="documents-section">
-      <div className="section-header">
-        <div>
-          <h2>Mis documenos</h2>
-          <p>
-            Consulta y administra tus documentos universitarios
-          </p>
-        </div>
-
-        <button className="upload-button">
-          ➕ Crear documento
-        </button>
-      </div>
-
-      <div className="empty-documents">
-        <div className="empty-icon">
-          📂
-        </div>
-        <h3>No tienes documentos todavía</h3>
-        <p>
-          Los documentos que crees aparecerán en esta sección
-        </p>
-      </div>
-    </section>
-  );
-}
-
 interface CreateDocumentSectionProps {
   selectedDocumentType: string | null;
   setSelectedDocumentType: (type: string) => void;
@@ -566,11 +541,13 @@ function CreateDocumentSection({
 interface DocumentFormProps{
   documentType: string | null;
   onBack: () => void;
+  onSaveDocument: (document: Document) => void;
 }
 
 function DocumentForm({
   documentType,
-  onBack
+  onBack,
+  onSaveDocument
 }: DocumentFormProps) {
 
   const [documentData, setDocumentData] = useState<Record<string, string>>({});
@@ -593,10 +570,17 @@ function DocumentForm({
 
     event.preventDefault();
 
-    console.log('Documento guardado:', {
-      documentType,
+    const newDocument: Document = {
+      id: Date.now(),
+      title: documentData.titulo || 'Sin título',
+      type: documentType || 'Desconocido',
+      status: 'BORRADOR',
+      createdAt: new Date().toISOString(),
       data: documentData
-    });
+    };
+
+    onSaveDocument(newDocument);
+    
 
   alert('Borrador guardado correctamente');
 
