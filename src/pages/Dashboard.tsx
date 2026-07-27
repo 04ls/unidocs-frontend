@@ -806,7 +806,7 @@ function DocumentForm({
 
   const handleSaveDraft = async (
   event: React.FormEvent<HTMLFormElement>
-) => {
+  ) => {
     event.preventDefault();
 
     const token = localStorage.getItem('token');
@@ -823,48 +823,74 @@ function DocumentForm({
       alert('Tipo de documento no válido');
       return;
     }
+
+    const esEdicion = existingDocument !== null;
+
+    const url = esEdicion
+      ? `http://localhost:3000/documentos/${existingDocument!.id}`
+      : 'http://localhost:3000/documentos';
+
+    const method = esEdicion
+      ? 'PUT'
+      : 'POST';
+
+    const body = esEdicion
+      ? {
+          titulo: documentData.titulo,
+          descripcion: documentData.CUER || '',
+          campos: prepararCampos()
+        }
+      : {
+          titulo: documentData.titulo,
+          descripcion: documentData.CUER || '',
+          idtipodocumento,
+          idunidad: 2,
+          campos: prepararCampos()
+        };
+
     console.log('Datos que se enviarán:', {
-      titulo: documentData.titulo,
-      idtipodocumento,
-      idunidad: 2,
-      campos: prepararCampos()
+      url,
+      method,
+      body
     });
 
     try {
+
       const response = await fetch(
-        'http://localhost:3000/documentos',
+        url,
         {
-          method: 'POST',
+          method,
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`
           },
-          body: JSON.stringify({
-            titulo: documentData.titulo,
-            descripcion: documentData.CUER || '',
-            idtipodocumento,
-            idunidad: 2,
-            campos: prepararCampos()
-          })
+          body: JSON.stringify(body)
         }
       );
 
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || 'Error al guardar el documento');
+        alert(
+          data.error ||
+          'Error al guardar el documento'
+        );
+
         return;
       }
 
-      const documentoCreado: Document = {
-        id: data.iddocumento,
+      const documentoGuardado: Document = {
 
-        title: data.titulo,
+        id:
+          data.iddocumento,
+
+        title:
+          data.titulo,
 
         type:
           documentTypeCodes[
             data.idtipodocumento
-          ] || '',
+          ] || documentType || '',
 
         status:
           convertirEstado(data.estado),
@@ -872,26 +898,44 @@ function DocumentForm({
         createdAt:
           data.fechacreacion,
 
-        data: documentData
+        data:
+          documentData
+
       };
 
-      if(existingDocument){
-        onUpdateDocument(documentoCreado);
-      }else{
-        onSaveDocument(documentoCreado);
+      if (esEdicion) {
+
+        onUpdateDocument(
+          documentoGuardado
+        );
+
+      } else {
+
+        onSaveDocument(
+          documentoGuardado
+        );
+
       }
 
-      alert('Borrador guardado correctamente');
+      alert(
+        esEdicion
+          ? 'Documento actualizado correctamente'
+          : 'Borrador guardado correctamente'
+      );
 
       onBack();
 
     } catch (error) {
+
       console.error(
         'Error al guardar documento:',
         error
       );
 
-      alert('No se pudo conectar con el servidor');
+      alert(
+        'No se pudo conectar con el servidor'
+      );
+
     }
   };
 

@@ -124,7 +124,7 @@ function App() {
               documento.idtipodocumento
             ] || '',
 
-            status: documento.estado,
+            status: documento.estado.toUpperCase() as Document['status'],
 
             createdAt: documento.fechacreacion,
 

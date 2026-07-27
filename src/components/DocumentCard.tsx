@@ -4,6 +4,7 @@ interface DocumentCardProps{
     document: Document;
     onViewDocument: (document: Document) => void;
     onEditDocument: (document: Document) => void;
+    onSendToReview: (document: Document) => void;
 }
 
 function getDocumentTypeName(type: string){
@@ -36,7 +37,8 @@ function getStatusName(status: Document['status']) {
 export default function DocumentCard({
     document,
     onViewDocument,
-    onEditDocument
+    onEditDocument,
+    onSendToReview
 }: DocumentCardProps) {
     return(
         <article className='document-card'>
@@ -60,20 +62,40 @@ export default function DocumentCard({
                     <strong>Creado:</strong>{' '}
                     {new Date(document.createdAt).toLocaleDateString()}
                 </p>
+                {document.data.FIRM && (
+                    <p>
+                        <strong>Firma:</strong>{' '}
+                        {document.data.FIRM ? 'Sí' : 'No'}
+                    </p>
+                )}
             </div>
             <div className='document-card-actions'>
-                <button 
+
+                <button
                     className='view-all-button'
-                    onClick={() => onViewDocument(document)}>
-                        👁️ Ver documento
+                    onClick={() => onViewDocument(document)}
+                >
+                    👁️ Ver documento
                 </button>
+
                 {document.status === 'BORRADOR' && (
-                    <button
-                        className='upload-button'
-                        onClick={() => onEditDocument(document)}>
+                    <>
+                        <button
+                            className='upload-button'
+                            onClick={() => onEditDocument(document)}
+                        >
                             ✏️ Editar
-                    </button>
+                        </button>
+
+                        <button
+                            className='upload-button'
+                            onClick={() => onSendToReview(document)}
+                        >
+                            📤 Enviar a revisión
+                        </button>
+                    </>
                 )}
+
             </div>
         </article>
     );
