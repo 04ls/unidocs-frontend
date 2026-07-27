@@ -3,6 +3,7 @@ import type { Document } from '../types/Document';
 interface DocumentCardProps{
     document: Document;
     onViewDocument: (document: Document) => void;
+    onEditDocument: (document: Document) => void;
 }
 
 function getDocumentTypeName(type: string){
@@ -34,7 +35,8 @@ function getStatusName(status: Document['status']) {
 
 export default function DocumentCard({
     document,
-    onViewDocument
+    onViewDocument,
+    onEditDocument
 }: DocumentCardProps) {
     return(
         <article className='document-card'>
@@ -45,9 +47,12 @@ export default function DocumentCard({
                         Tipo: {getDocumentTypeName(document.type)}
                     </span>
                 </div>
-                <span 
-                    className={`document-status ${document.status.toLowerCase()}`}>
-                        {getStatusName(document.status)}
+                <span
+                    className={`document-status ${
+                        (document.status || 'BORRADOR').toLowerCase()
+                    }`}
+                    >
+                    {getStatusName(document.status || 'BORRADOR')}
                 </span>
             </div>
             <div className='document-card-info'>
@@ -62,6 +67,13 @@ export default function DocumentCard({
                     onClick={() => onViewDocument(document)}>
                         👁️ Ver documento
                 </button>
+                {document.status === 'BORRADOR' && (
+                    <button
+                        className='upload-button'
+                        onClick={() => onEditDocument(document)}>
+                            ✏️ Editar
+                    </button>
+                )}
             </div>
         </article>
     );

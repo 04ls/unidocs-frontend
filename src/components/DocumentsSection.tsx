@@ -6,47 +6,184 @@ import { useState } from 'react';
 interface DocumentsSectionProps {
   user: User;
   documents: Document[];
+  onEditDocument: (document: Document) => void;
+  onCreateDocument: () => void;
 }
 
-function getFieldName(code: string){
-    const fieldNames: Record<string, string> = {
-        C01: 'Fecha Fin',
-        C02: 'Unidad Destinataria',
-        C03: 'Firma',
-        C04: 'Observaciones',
-        C05: 'Fecha de Envío',
-        C06: 'Número de Referencia',
-        C07: 'Asunto',
-        C08: 'Cuerpo del Texto',
-        C10: 'Participantes',
-        C11: 'Lugar de Emisión',
-        C12: 'Base Legal',
-        C13: 'Vigencia',
-        C14: 'Monto',
-        C15: 'Partes Contratantes',
-        C16: 'Días Solicitados',
-        C17: 'Fecha de Regreso'
-    };
-
-    return fieldNames[code] || code;
+interface DocumentField {
+  campo_codigo: string;
+  valortexto: string | null;
+  valorfecha: string | null;
+  valornumerico: number | null;
+  valorbooleano: boolean | null;
 }
 
+interface DocumentDetailResponse {
+  iddocumento: number;
+  titulo: string;
+  descripcion: string | null;
+  fechacreacion: string;
+  estado: string;
+  error?: string;
+  tipodocumentos?: {
+    codigo: string;
+    nombre: string;
+  };
+  documentocampos: DocumentField[];
+}
+
+function getDocumentTypeName(code: string) {
+  const documentTypes: Record<string, string> = {
+    MEM: 'Memorando',
+    OFI: 'Oficio',
+    RES: 'Resolución',
+    INF: 'Informe',
+    ACT: 'Acta',
+    CIR: 'Circular',
+    DIC: 'Dictamen',
+    CTR: 'Contrato',
+    VAC: 'Permiso de Vacaciones'
+  };
+
+  return documentTypes[code] || code;
+}
+
+
+function getFieldName(code: string) {
+  const fieldNames: Record<string, string> = {
+    ASUN: 'Asunto',
+    FECH: 'Fecha',
+    MONT: 'Monto',
+    FIRM: 'Firma',
+    CUER: 'Cuerpo del Texto',
+    UNID: 'Unidad Destinataria',
+    OBSE: 'Observaciones',
+    REFE: 'Número de Referencia',
+    LUGA: 'Lugar de Emisión',
+    BASE: 'Base Legal',
+    VIGE: 'Vigencia',
+    PART: 'Partes Contratantes',
+    DIAS: 'Días Solicitados',
+    REGR: 'Fecha de Regreso'
+  };
+
+  return fieldNames[code] || code;
+}
 export default function DocumentsSection({
   user,
-  documents
+  documents,
+  onEditDocument,
+  onCreateDocument
 }: DocumentsSectionProps) {
 
   const [selectedDocument, setSelectedDocument] =
     useState<Document | null>(null);
 
-  const handleViewDocument = (document: Document) => {
-    setSelectedDocument(document);
+
+  const handleViewDocument = async (document: Document) => {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      alert('No hay una sesión activa');
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:3000/documentos/${document.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      const data: DocumentDetailResponse = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || 'Error al obtener el documento');
+        return;
+      }
+
+      const documentoDetalle: Document = {
+        id: data.iddocumento,
+
+        title: data.titulo,
+
+        type: data.tipodocumentos?.codigo || '',
+
+        status: data.estado.toUpperCase() as Document['status'],
+
+        createdAt: data.fechacreacion,
+
+        data: {
+          titulo: data.titulo,
+
+          descripcion:
+            data.descripcion || '',
+
+          ...Object.fromEntries(
+
+            data.documentocampos.map(
+              (campo: DocumentField) => {
+
+                let valor: string | number | boolean = '';
+
+                if (campo.valortexto !== null) {
+                  valor = campo.valortexto;
+                }
+
+                else if (campo.valorfecha !== null) {
+                  valor = campo.valorfecha.split('T')[0];
+                }
+
+                else if (campo.valornumerico !== null) {
+                  valor = campo.valornumerico;
+                }
+
+                else if (campo.valorbooleano !== null) {
+                  valor = campo.valorbooleano;
+                }
+
+                return [
+                  campo.campo_codigo,
+                  valor
+                ];
+
+              }
+            )
+
+          )
+
+        }
+
+      };
+
+      console.log('Estado recibido del backend: ', data.estado);
+      console.log('Estado convertido:', data.estado.toUpperCase());
+      console.log('Documento detalle:', documentoDetalle);
+
+      setSelectedDocument(documentoDetalle);
+      
+
+    } catch (error) {
+      console.error(
+        'Error al obtener el documento:',
+        error
+      );
+
+      alert('No se pudo conectar con el servidor');
+    }
   };
+
+  const handleEditDocument = (document: Document) => {
+    onEditDocument(document);
+  };
+
 
   return (
     <section className="documents-section">
-
-      {selectedDocument ? (
+       {selectedDocument ? (
 
         <div className="document-details">
 
@@ -60,20 +197,36 @@ export default function DocumentsSection({
               </p>
             </div>
 
-            <button
-              className="view-all-button"
-              onClick={() => setSelectedDocument(null)}
-            >
-              ← Volver
-            </button>
+            <div className="form-actions">
 
-          </div>
+              {selectedDocument.status.toUpperCase() === 'BORRADOR' && (
+                <button
+                  className="upload-button"
+                  onClick={() => {
+                    onEditDocument(selectedDocument);
+                    setSelectedDocument(null);
+                  }}
+                >
+                  ✏️ Editar documento
+                </button>
+              )}
+
+              <button
+                className="view-all-button"
+                onClick={() => setSelectedDocument(null)}
+              >
+                ← Volver
+              </button>
+
+            </div>
+
+        </div>
 
           <div className="document-details-info">
 
             <p>
               <strong>Tipo:</strong>{' '}
-              {selectedDocument.type}
+              {getDocumentTypeName(selectedDocument.type)}
             </p>
 
             <p>
@@ -126,7 +279,7 @@ export default function DocumentsSection({
               </p>
             </div>
 
-            <button className="upload-button">
+            <button className="upload-button" onClick={onCreateDocument}>
               ➕ Crear documento
             </button>
 
@@ -159,6 +312,7 @@ export default function DocumentsSection({
                   key={document.id}
                   document={document}
                   onViewDocument={handleViewDocument}
+                  onEditDocument={handleEditDocument}
                 />
 
               ))}
