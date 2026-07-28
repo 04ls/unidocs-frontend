@@ -1,4 +1,4 @@
-import { useState,  type ChangeEvent } from 'react';
+import { useState, useEffect,  type ChangeEvent } from 'react';
 import type { User } from '../types/User';
 import type { Document } from '../types/Document'
 import DocumentsSection from '../components/DocumentsSection';
@@ -210,7 +210,18 @@ function Dashboard({
         {user.role === 'USUARIO' && (
           <>
             {activeSection === 'inicio' && (
-              <UserDashboard />
+              <UserDashboard
+                documents={documents}
+                onCreateDocument={() => {
+                  setSelectedDocumentType(null);
+                  setDocumentToEdit(null);
+                  setDocumentStep('selection');
+                  setActiveSection('crear');
+                }}
+                onViewAllDocuments={() => {
+                  setActiveSection('documentos');
+                }}
+              />
             )}
 
             {activeSection === 'documentos' && (
@@ -249,11 +260,15 @@ function Dashboard({
             )}
 
             {activeSection === 'solicitudes' && (
-              <RequestsSection />
+              <RequestsSection 
+                documents={documents}
+              />
             )}
 
             {activeSection === 'historial' && (
-              <HistorySection />
+              <HistorySection
+                documents={documents}
+              />
             )}
           </>
         )}
@@ -330,8 +345,36 @@ function getRoleName(role: User['role']) {
   }
 }
 
+interface UserDashboardProps {
+  documents: Document[];
+  onCreateDocument: () => void;
+  onViewAllDocuments: () => void;
+}
 
-function UserDashboard() {
+function UserDashboard({
+  documents,
+  onCreateDocument,
+  onViewAllDocuments
+}: UserDashboardProps) {
+
+  const totalDocuments = documents.length;
+
+  const documentsInProcess = documents.filter(
+    document => document.status === 'EN_PROCESO'
+  ).length;
+
+  const completedDocuments = documents.filter(
+    document => document.status === 'COMPLETADO'
+  ).length;
+
+  const recentDocuments = [...documents]
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() -
+        new Date(a.createdAt).getTime()
+    )
+    .slice(0, 5);
+
   return (
     <>
 
@@ -341,7 +384,7 @@ function UserDashboard() {
           <span className="stat-icon">📄</span>
 
           <div>
-            <h3>0</h3>
+            <h3>{totalDocuments}</h3>
             <p>Mis documentos</p>
           </div>
 
@@ -352,7 +395,7 @@ function UserDashboard() {
           <span className="stat-icon">🔄</span>
 
           <div>
-            <h3>0</h3>
+            <h3>{documentsInProcess}</h3>
             <p>En proceso</p>
           </div>
 
@@ -363,7 +406,7 @@ function UserDashboard() {
           <span className="stat-icon">✅</span>
 
           <div>
-            <h3>0</h3>
+            <h3>{completedDocuments}</h3>
             <p>Completados</p>
           </div>
 
@@ -375,30 +418,85 @@ function UserDashboard() {
       <section className="documents-section">
 
         <div className="section-header">
-          <h2>Mis documentos recientes</h2>
 
-          <button className="view-all-button">
+          <h2>
+            Mis documentos recientes
+          </h2>
+
+          <button
+            className="view-all-button"
+            onClick={onViewAllDocuments}
+          >
             Ver todos
           </button>
+
         </div>
 
-        <div className="empty-documents">
 
-          <div className="empty-icon">
-            📂
+        {recentDocuments.length === 0 ? (
+
+          <div className="empty-documents">
+
+            <div className="empty-icon">
+              📂
+            </div>
+
+            <h3>
+              Aún no tienes documentos
+            </h3>
+
+            <p>
+              Puedes comenzar creando un nuevo documento.
+            </p>
+
+            <button
+              className="upload-button"
+              onClick={onCreateDocument}
+            >
+              ➕ Crear documento
+            </button>
+
           </div>
 
-          <h3>Aún no tienes documentos</h3>
+        ) : (
 
-          <p>
-            Puedes comenzar creando un nuevo documento.
-          </p>
+          <div className="documents-list">
 
-          <button className="upload-button">
-            ➕ Crear documento
-          </button>
+            {recentDocuments.map(document => (
 
-        </div>
+              <div
+                className="document-card"
+                key={document.id}
+              >
+
+                <div>
+                  <h3>
+                    {document.title}
+                  </h3>
+
+                  <p>
+                    Tipo: {document.type}
+                  </p>
+
+                  <small>
+                    Creado: {document.createdAt}
+                  </small>
+                </div>
+
+
+                <span
+                  className={`document-status ${document.status.toLowerCase()}`}
+                >
+                  {document.status}
+                </span>
+
+              </div>
+
+            ))}
+
+          </div>
+
+        )}
 
       </section>
 
@@ -1110,55 +1208,444 @@ function DocumentForm({
   
 }
 
-function RequestsSection(){
-  return(
-    <section className='documents-section'>
-      <div className='section-header'>
+interface RequestsSectionProps {
+  documents: Document[];
+}
+
+function RequestsSection({
+  documents
+}: RequestsSectionProps) {
+
+  const requests = documents.filter(
+    document => document.status !== 'BORRADOR'
+  );
+
+  return (
+    <section className="documents-section">
+
+      <div className="section-header">
+
         <div>
           <h2>Mis solicitudes</h2>
+
           <p>
             Consulta el estado de tus solicitudes
           </p>
         </div>
+
       </div>
-      <div className='empty-documents'>
-        <div className='empty-icon'>
-          📋
-        </div>
-        <h3>No tienes solicitudes</h3>
+
+
+      {requests.length === 0 ? (
+
+        <div className="empty-documents">
+
+          <div className="empty-icon">
+            📋
+          </div>
+
+          <h3>
+            No tienes solicitudes
+          </h3>
+
           <p>
             Tus solicitudes aparecerán aquí
           </p>
-      </div>
+
+        </div>
+
+      ) : (
+
+        <div className="documents-list">
+
+          {requests.map(document => (
+
+            <div
+              className="document-card"
+              key={document.id}
+            >
+
+              <div>
+
+                <h3>
+                  {document.title}
+                </h3>
+
+                <p>
+                  Tipo: {document.type}
+                </p>
+
+                <small>
+                  Fecha de creación: {document.createdAt}
+                </small>
+
+              </div>
+
+
+              <span
+                className={`document-status ${document.status.toLowerCase()}`}
+              >
+                {document.status}
+              </span>
+
+            </div>
+
+          ))}
+
+        </div>
+
+      )}
+
     </section>
   );
 }
 
-function HistorySection(){
-  return(
-    <section className='documents-section'>
-      <div className='section-header'>
+interface HistorySectionProps {
+  documents: Document[];
+}
+
+interface HistoryItem {
+  idmovimiento: number;
+  tipomovimiento: string;
+  fecha: string;
+  observacion: string | null;
+  iddocumento: number;
+  tituloDocumento: string;
+}
+
+function getMovementName(
+  movement: string
+) {
+  switch (movement) {
+
+    case 'Creacion':
+      return 'Documento creado';
+
+    case 'Edicion':
+      return 'Documento actualizado';
+
+    case 'CambioEstado':
+      return 'Documento enviado a revisión';
+
+    case 'Firma':
+      return 'Firma registrada';
+
+    default:
+      return movement;
+  }
+}
+
+function HistorySection({
+  documents
+}: HistorySectionProps) {
+
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+
+    const cargarHistorial = async () => {
+
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+
+        const historialCompleto: HistoryItem[] = [];
+
+        for (const document of documents) {
+
+          const response = await fetch(
+            `http://localhost:3000/documentos/${document.id}/trazabilidad`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
+            }
+          );
+
+          if (!response.ok) {
+            continue;
+          }
+
+          const data = await response.json();
+
+          data.movimientos.forEach(
+            (movimiento: {
+              idmovimiento: number;
+              tipomovimiento: string;
+              fecha: string;
+              observacion: string | null;
+              iddocumento: number;
+            }) => {
+
+              historialCompleto.push({
+
+                idmovimiento:
+                  movimiento.idmovimiento,
+
+                tipomovimiento:
+                  movimiento.tipomovimiento,
+
+                fecha:
+                  movimiento.fecha,
+
+                observacion:
+                  movimiento.observacion,
+
+                iddocumento:
+                  movimiento.iddocumento,
+
+                tituloDocumento:
+                  document.title
+
+              });
+
+            }
+          );
+
+        }
+
+        historialCompleto.sort(
+          (a, b) =>
+            new Date(b.fecha).getTime() -
+            new Date(a.fecha).getTime()
+        );
+
+        setHistory(historialCompleto);
+
+      } catch (error) {
+
+        console.error(
+          'Error al cargar historial:',
+          error
+        );
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    };
+
+    cargarHistorial();
+
+  }, [documents]);
+
+
+  if (loading) {
+
+    return (
+      <section className="documents-section">
+
+        <h2>
+          Historial
+        </h2>
+
+        <p>
+          Cargando historial...
+        </p>
+
+      </section>
+    );
+
+  }
+
+
+  return (
+
+    <section className="documents-section">
+
+      <div className="section-header">
+
         <div>
-          <h2>Historial</h2>
+
+          <h2>
+            Historial
+          </h2>
+
           <p>
             Consulta el historial de tus documentos y solicitudes
           </p>
+
         </div>
+
       </div>
-      <div className='empty-documents'>
-        <div className='empty-icon'>
-          🕒
+
+
+      {history.length === 0 ? (
+
+        <div className="empty-documents">
+
+          <div className="empty-icon">
+            🕒
+          </div>
+
+          <h3>
+            No hay actividad registrada
+          </h3>
+
+          <p>
+            Las acciones relacionadas con tus documentos aparecerán aquí
+          </p>
+
         </div>
-        <h3>No hay actividad registrada</h3>
-        <p>
-          Las acciones relacionadas con tus documentos aparecerán aquí
-        </p>
-      </div>
+
+      ) : (
+
+        <div className="documents-list">
+
+          {history.map(item => (
+
+            <div
+              className="document-card"
+              key={item.idmovimiento}
+            >
+
+              <div>
+
+                <h3>
+                  {item.tituloDocumento}
+                </h3>
+
+                <p>
+                  {item.observacion}
+                </p>
+
+                <small>
+                  {new Date(item.fecha).toLocaleString('es-HN')}
+                </small>
+
+              </div>
+
+
+              <span
+                className={`document-status ${item.tipomovimiento.toLowerCase()}`}
+              >
+                {getMovementName(item.tipomovimiento)}
+              </span>
+
+            </div>
+
+          ))}
+
+        </div>
+
+      )}
+
     </section>
+
   );
+
+}
+
+interface BackendDocument {
+  iddocumento: number;
+  titulo: string;
+  estado: string;
+  fechacreacion: string;
+  tipodocumentos?: {
+    codigo: string;
+  };
+}
+
+function convertirEstadoDocumento(
+  estado: string
+): Document['status'] {
+
+  const estadoNormalizado = estado.toUpperCase();
+
+  if (
+    estadoNormalizado === 'BORRADOR' ||
+    estadoNormalizado === 'EN_PROCESO' ||
+    estadoNormalizado === 'COMPLETADO' ||
+    estadoNormalizado === 'RECHAZADO'
+  ) {
+    return estadoNormalizado;
+  }
+
+  return 'BORRADOR';
 }
 
 function ManagerDashboard() {
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const cargarDocumentos = async () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          'http://localhost:3000/documentos',
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            'Error al obtener documentos'
+          );
+        }
+
+        const data: BackendDocument[] =
+          await response.json();
+
+        console.log('Documentos recibidos por gestor: ',data);  
+
+        const documentosTransformados: Document[] =
+          data.map((documento) => ({
+            id: documento.iddocumento,
+            title: documento.titulo,
+            type: documento.tipodocumentos?.codigo || '',
+            status: convertirEstadoDocumento(documento.estado),
+            createdAt: documento.fechacreacion,
+            data: {}
+          }));
+
+        setDocuments(documentosTransformados);
+
+      } catch (error) {
+
+        console.error(
+          'Error al cargar documentos del gestor:',
+          error
+        );
+
+      } finally {
+
+        setLoading(false);
+
+      }
+    };
+
+    cargarDocumentos();
+
+  }, []);
+
+  const pendientes = documents.filter(
+    document => document.status === 'EN_PROCESO'
+  );
+
+  const procesados = documents.filter(
+    document =>
+      document.status === 'COMPLETADO' ||
+      document.status === 'RECHAZADO'
+  );
+
   return (
     <>
 
@@ -1168,8 +1655,13 @@ function ManagerDashboard() {
           <span className="stat-icon">📥</span>
 
           <div>
-            <h3>0</h3>
-            <p>Pendientes</p>
+            <h3>
+              {pendientes.length}
+            </h3>
+
+            <p>
+              Pendientes
+            </p>
           </div>
 
         </div>
@@ -1179,8 +1671,13 @@ function ManagerDashboard() {
           <span className="stat-icon">🔍</span>
 
           <div>
-            <h3>0</h3>
-            <p>En revisión</p>
+            <h3>
+              {documents.length}
+            </h3>
+
+            <p>
+              Documentos recibidos
+            </p>
           </div>
 
         </div>
@@ -1190,8 +1687,13 @@ function ManagerDashboard() {
           <span className="stat-icon">✅</span>
 
           <div>
-            <h3>0</h3>
-            <p>Procesados</p>
+            <h3>
+              {procesados.length}
+            </h3>
+
+            <p>
+              Procesados
+            </p>
           </div>
 
         </div>
@@ -1201,21 +1703,77 @@ function ManagerDashboard() {
 
       <section className="documents-section">
 
-        <h2>Documentos pendientes</h2>
+        <h2>
+          Documentos pendientes
+        </h2>
 
-        <div className="empty-documents">
 
-          <div className="empty-icon">
-            📥
+        {loading ? (
+
+          <div className="empty-documents">
+
+            <h3>
+              Cargando documentos...
+            </h3>
+
           </div>
 
-          <h3>No hay documentos pendientes</h3>
+        ) : pendientes.length === 0 ? (
 
-          <p>
-            Los documentos que requieran gestión aparecerán aquí.
-          </p>
+          <div className="empty-documents">
 
-        </div>
+            <div className="empty-icon">
+              📥
+            </div>
+
+            <h3>
+              No hay documentos pendientes
+            </h3>
+
+            <p>
+              Los documentos que requieran gestión aparecerán aquí.
+            </p>
+
+          </div>
+
+        ) : (
+
+          <div className="documents-list">
+
+            {pendientes.map((document) => (
+
+              <div
+                className="document-card"
+                key={document.id}
+              >
+
+                <h3>
+                  {document.title}
+                </h3>
+
+                <p>
+                  Tipo: {document.type}
+                </p>
+
+                <p>
+                  Estado: {document.status}
+                </p>
+
+                <p>
+                  Creado: {
+                    new Date(
+                      document.createdAt
+                    ).toLocaleDateString()
+                  }
+                </p>
+
+              </div>
+
+            ))}
+
+          </div>
+
+        )}
 
       </section>
 
