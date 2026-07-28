@@ -17,6 +17,7 @@ function Dashboard({
   onUpdateDocument 
 }: DashboardProps) {
   console.log('Usuario recibido en dashboard: ', user);
+  console.log('Documentos recibidos:',documents)
   const [activeSection, setActiveSection] = useState('inicio');
   const [selectedDocumentType, setSelectedDocumentType] = useState<string | null>(null);
   const [documentToEdit, setDocumentToEdit] = useState<Document | null>(null);
@@ -274,7 +275,7 @@ function Dashboard({
         )}
 
         {user.role === 'GESTOR' && (
-          <ManagerDashboard />
+          <ManagerDashboard/>
         )}
 
         {user.role === 'APROBADOR' && (
@@ -1544,6 +1545,38 @@ function HistorySection({
 
 }
 
+interface DocumentDetail {
+  iddocumento: number;
+  codigo: string;
+  titulo: string;
+  descripcion: string;
+  fechacreacion: string;
+  estado: string;
+
+  tipodocumentos: {
+    codigo: string;
+    nombre: string;
+  };
+
+  unidades: {
+    nombre: string;
+  };
+
+  documentocampos: {
+    iddocumentocampo?: number;
+    campo_nombre: string;
+    campo_codigo: string;
+    valortexto?: string;
+    valorfecha?: string;
+    valornumerico?: number;
+    valorbooleano?: boolean;
+  }[];
+
+  firmaaprobaciones: unknown[];
+
+  movimientodocumento: unknown[];
+}
+
 interface BackendDocument {
   iddocumento: number;
   titulo: string;
@@ -1572,9 +1605,11 @@ function convertirEstadoDocumento(
   return 'BORRADOR';
 }
 
-function ManagerDashboard() {
+
+function ManagerDashboard(){
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentDetail | null>(null);
 
   useEffect(() => {
     const cargarDocumentos = async () => {
@@ -1635,6 +1670,52 @@ function ManagerDashboard() {
     cargarDocumentos();
 
   }, []);
+
+  const verDocumento = async (id: number) => {
+
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      return;
+    }
+
+    try {
+
+      const response = await fetch(
+        `http://localhost:3000/documentos/${id}`,
+        {
+          headers:{
+            Authorization:`Bearer ${token}`
+          }
+        }
+      );
+
+
+      if (!response.ok) {
+        throw new Error(
+          'No se pudo obtener el documento'
+        );
+      }
+
+
+      const data: DocumentDetail =
+        await response.json();
+
+      console.log("Detalle completo:",data)
+
+      setSelectedDocument(data);
+
+
+    } catch(error){
+
+      console.error(
+        'Error al obtener detalle:',
+        error
+      );
+
+    }
+
+  };
 
   const pendientes = documents.filter(
     document => document.status === 'EN_PROCESO'
@@ -1708,70 +1789,176 @@ function ManagerDashboard() {
         </h2>
 
 
-        {loading ? (
+        {selectedDocument ? (
 
-          <div className="empty-documents">
+          <div className="document-detail">
 
-            <h3>
-              Cargando documentos...
-            </h3>
+            <button
+              className="view-all-button"
+              onClick={() => setSelectedDocument(null)}
+            >
+              ← Volver
+            </button>
 
-          </div>
 
-        ) : pendientes.length === 0 ? (
+            <h2>
+              {selectedDocument.titulo}
+            </h2>
 
-          <div className="empty-documents">
 
-            <div className="empty-icon">
-              📥
+            <div className="detail-info">
+
+              <p>
+                <strong>Código:</strong>{" "}
+                {selectedDocument.codigo}
+              </p>
+
+
+              <p>
+                <strong>Tipo:</strong>{" "}
+                {selectedDocument.tipodocumentos.nombre}
+              </p>
+
+
+              <p>
+                <strong>Estado:</strong>{" "}
+                {selectedDocument.estado}
+              </p>
+
+
+              <p>
+                <strong>Unidad:</strong>{" "}
+                {selectedDocument.unidades.nombre}
+              </p>
+
+
+              <p>
+                <strong>Fecha creación:</strong>{" "}
+                {
+                  new Date(
+                    selectedDocument.fechacreacion
+                  ).toLocaleDateString()
+                }
+              </p>
+
             </div>
 
+
             <h3>
-              No hay documentos pendientes
+              Información del documento
             </h3>
 
-            <p>
-              Los documentos que requieran gestión aparecerán aquí.
-            </p>
+
+            <div className="document-fields">
+
+              {selectedDocument.documentocampos.map(
+                campo => (
+
+                  <div
+                    className="field-card"
+                    key={campo.iddocumentocampo}
+                  >
+
+                    <strong>
+                      {campo.campo_nombre}
+                    </strong>
+
+
+                    <p>
+
+                      {
+                        campo.valortexto ??
+                        campo.valorfecha ??
+                        campo.valornumerico ??
+                        (campo.valorbooleano
+                          ? "Sí"
+                          : "No")
+                      }
+
+                    </p>
+
+
+                  </div>
+
+                )
+              )}
+
+            </div>
+
 
           </div>
 
         ) : (
 
-          <div className="documents-list">
+          loading ? (
 
-            {pendientes.map((document) => (
+            <div className="empty-documents">
 
-              <div
-                className="document-card"
-                key={document.id}
-              >
+              <h3>
+                Cargando documentos...
+              </h3>
 
-                <h3>
-                  {document.title}
-                </h3>
+            </div>
 
-                <p>
-                  Tipo: {document.type}
-                </p>
 
-                <p>
-                  Estado: {document.status}
-                </p>
+          ) : pendientes.length === 0 ? (
 
-                <p>
-                  Creado: {
-                    new Date(
-                      document.createdAt
-                    ).toLocaleDateString()
-                  }
-                </p>
+            <div className="empty-documents">
 
+              <div className="empty-icon">
+                📥
               </div>
 
-            ))}
+              <h3>
+                No hay documentos pendientes
+              </h3>
 
-          </div>
+              <p>
+                Los documentos que requieran gestión aparecerán aquí.
+              </p>
+
+            </div>
+
+
+          ) : (
+
+            <div className="documents-list">
+
+              {pendientes.map((document) => (
+
+                <div
+                  className="document-card"
+                  key={document.id}
+                >
+
+                  <h3>
+                    {document.title}
+                  </h3>
+
+                  <p>
+                    Tipo: {document.type}
+                  </p>
+
+                  <p>
+                    Estado: {document.status}
+                  </p>
+
+
+                  <button
+                    className="view-all-button"
+                    onClick={() => verDocumento(document.id)}
+                  >
+                    👁️ Ver documento
+                  </button>
+
+
+                </div>
+
+              ))}
+
+            </div>
+
+          )
 
         )}
 
