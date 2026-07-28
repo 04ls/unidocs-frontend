@@ -8,6 +8,7 @@ interface DocumentsSectionProps {
   documents: Document[];
   onEditDocument: (document: Document) => void;
   onCreateDocument: () => void;
+  onSendToReview: (document: Document) => void;
 }
 
 interface DocumentField {
@@ -73,7 +74,8 @@ export default function DocumentsSection({
   user,
   documents,
   onEditDocument,
-  onCreateDocument
+  onCreateDocument,
+  onSendToReview
 }: DocumentsSectionProps) {
 
   const [selectedDocument, setSelectedDocument] =
@@ -179,52 +181,6 @@ export default function DocumentsSection({
   const handleEditDocument = (document: Document) => {
     onEditDocument(document);
   };
-
-  const handleSendToReview = async (document: Document) => {
-    const token = localStorage.getItem('token');
-
-    if (!token) {
-      alert('No hay una sesión activa');
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `http://localhost:3000/documentos/${document.id}/estado`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            estado: 'EN_PROCESO',
-            observacion: 'Documento enviado a revisión'
-          })
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(data.error || 'No se pudo enviar el documento a revisión');
-        return;
-      }
-
-      alert('Documento enviado a revisión correctamente');
-
-      setSelectedDocument(null);
-
-    } catch (error) {
-      console.error(
-        'Error al enviar documento a revisión:',
-        error
-      );
-
-      alert('No se pudo conectar con el servidor');
-    }
-  };
-
 
   return (
     <section className="documents-section">
@@ -363,7 +319,7 @@ export default function DocumentsSection({
                   document={document}
                   onViewDocument={handleViewDocument}
                   onEditDocument={handleEditDocument}
-                  onSendToReview={handleSendToReview}
+                  onSendToReview={onSendToReview}
                 />
 
               ))}

@@ -8,13 +8,15 @@ interface DashboardProps {
   documents: Document[];
   onSaveDocument: (document: Document) => void;
   onUpdateDocument: (document: Document) => void;
+  onSendToReview: (document: Document) => void;
 }
 
 function Dashboard({ 
   user,
   documents,
   onSaveDocument,
-  onUpdateDocument 
+  onUpdateDocument,
+  onSendToReview 
 }: DashboardProps) {
   console.log('Usuario recibido en dashboard: ', user);
   console.log('Documentos recibidos:',documents)
@@ -29,6 +31,9 @@ function Dashboard({
     setDocumentStep('form');
     setActiveSection('crear');
   };
+
+  console.log("Dashboard recibió:", user);
+  console.log("ROL DASHBOARD:", user.role);
 
   return (
     <main className="dashboard">
@@ -230,6 +235,7 @@ function Dashboard({
               user={user}
               documents={documents}
               onEditDocument={handleEditDocument}
+              onSendToReview={onSendToReview}
               onCreateDocument={() => {
                 setSelectedDocumentType(null);
                 setDocumentToEdit(null);
@@ -673,7 +679,8 @@ type DocumentStatus =
   | 'BORRADOR'
   | 'EN_PROCESO'
   | 'COMPLETADO'
-  | 'RECHAZADO';
+  | 'RECHAZADO'
+  | 'EN_APROBACION';
 
 function DocumentForm({
   documentType,
@@ -1597,7 +1604,8 @@ function convertirEstadoDocumento(
     estadoNormalizado === 'BORRADOR' ||
     estadoNormalizado === 'EN_PROCESO' ||
     estadoNormalizado === 'COMPLETADO' ||
-    estadoNormalizado === 'RECHAZADO'
+    estadoNormalizado === 'RECHAZADO' ||
+    estadoNormalizado === 'EN_APROBACION'
   ) {
     return estadoNormalizado;
   }
@@ -1611,65 +1619,81 @@ function ManagerDashboard(){
   const [loading, setLoading] = useState(true);
   const [selectedDocument, setSelectedDocument] = useState<DocumentDetail | null>(null);
 
-  useEffect(() => {
-    const cargarDocumentos = async () => {
-      const token = localStorage.getItem('token');
+  const cargarDocumentos = async () => {
 
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+  const token = localStorage.getItem('token');
 
-      try {
-        const response = await fetch(
-          'http://localhost:3000/documentos',
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        );
+  if (!token) {
+    setLoading(false);
+    return;
+  }
 
-        if (!response.ok) {
-          throw new Error(
-            'Error al obtener documentos'
-          );
+  try {
+
+    const response = await fetch(
+      'http://localhost:3000/documentos',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
-
-        const data: BackendDocument[] =
-          await response.json();
-
-        console.log('Documentos recibidos por gestor: ',data);  
-
-        const documentosTransformados: Document[] =
-          data.map((documento) => ({
-            id: documento.iddocumento,
-            title: documento.titulo,
-            type: documento.tipodocumentos?.codigo || '',
-            status: convertirEstadoDocumento(documento.estado),
-            createdAt: documento.fechacreacion,
-            data: {}
-          }));
-
-        setDocuments(documentosTransformados);
-
-      } catch (error) {
-
-        console.error(
-          'Error al cargar documentos del gestor:',
-          error
-        );
-
-      } finally {
-
-        setLoading(false);
-
       }
-    };
+    );
 
-    cargarDocumentos();
 
-  }, []);
+    if (!response.ok) {
+      throw new Error(
+        'Error al obtener documentos'
+      );
+    }
+
+
+    const data: BackendDocument[] =
+      await response.json();
+
+    console.log(
+      "RESPUESTA COMPLETA GESTOR:",
+      JSON.stringify(data, null, 2)
+    );
+
+    const documentosTransformados: Document[] =
+      data.map((documento) => ({
+        id: documento.iddocumento,
+        title: documento.titulo,
+        type: documento.tipodocumentos?.codigo || '',
+        status: convertirEstadoDocumento(documento.estado),
+        createdAt: documento.fechacreacion,
+        data: {}
+      }));
+
+
+    setDocuments(documentosTransformados);
+
+
+  } catch (error) {
+
+    console.error(
+      'Error al cargar documentos del gestor:',
+      error
+    );
+
+  } finally {
+
+    setLoading(false);
+
+  }
+
+};
+
+
+useEffect(() => {
+
+  const cargar = async () => {
+    await cargarDocumentos();
+  };
+
+  cargar();
+
+}, []);
 
   const verDocumento = async (id: number) => {
 
@@ -1717,8 +1741,82 @@ function ManagerDashboard(){
 
   };
 
+  const enviarAprobacion = async (
+    document: DocumentDetail
+  ) => {
+
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      alert('No hay una sesión activa');
+      return;
+    }
+
+    try {
+
+      const response = await fetch(
+        `http://localhost:3000/documentos/${document.iddocumento}/estado`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            estado: 'EN_APROBACION',
+            observacion: 'Documento enviado a aprobación'
+          })
+        }
+      );
+
+
+      const data = await response.json();
+
+
+      if (!response.ok) {
+
+        alert(
+          data.error ||
+          'No se pudo enviar el documento a aprobación'
+        );
+
+        return;
+
+      }
+
+
+      alert(
+        'Documento enviado a aprobación correctamente'
+      );
+
+
+      // Actualizar la vista actual
+      setSelectedDocument(null);
+
+
+      // Recargar documentos del gestor
+      await cargarDocumentos();
+
+
+    } catch (error) {
+
+      console.error(
+        'Error al enviar a aprobación:',
+        error
+      );
+
+      alert(
+        'No se pudo conectar con el servidor'
+      );
+
+    }
+
+  };
+
   const pendientes = documents.filter(
-    document => document.status === 'EN_PROCESO'
+    document => 
+      document.status === 'EN_PROCESO' ||
+      document.status === 'EN_APROBACION'
   );
 
   const procesados = documents.filter(
@@ -1840,6 +1938,31 @@ function ManagerDashboard(){
                   ).toLocaleDateString()
                 }
               </p>
+
+            </div>
+
+            <div className="form-actions">
+
+              <button
+                className="upload-button"
+              >
+                ✔️ Revisar documento
+              </button>
+
+
+              <button
+                className="upload-button"
+                onClick={() => enviarAprobacion(selectedDocument)}
+              >
+                📤 Enviar a aprobación
+              </button>
+
+
+              <button
+                className="view-all-button"
+              >
+                ❌ Rechazar
+              </button>
 
             </div>
 
@@ -1970,17 +2093,132 @@ function ManagerDashboard(){
 
 
 function ApproverDashboard() {
+
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+
+
+  useEffect(() => {
+
+    const cargarDocumentos = async () => {
+
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+
+        const response = await fetch(
+          'http://localhost:3000/documentos',
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+
+        if (!response.ok) {
+          throw new Error(
+            'Error al obtener documentos'
+          );
+        }
+
+
+        const data = await response.json();
+
+
+        console.log(
+          'Documentos recibidos por aprobador:',
+          data
+        );
+
+        console.log(
+          "Respuesta cruda aprobador:",
+          data
+        );
+
+
+        const documentosTransformados: Document[] =
+          data.map((documento: any) => ({
+            
+            id: documento.iddocumento,
+
+            title: documento.titulo,
+
+            type:
+              documento.tipodocumentos?.codigo || '',
+
+            status:
+              convertirEstadoDocumento(documento.estado),
+
+            createdAt:
+              documento.fechacreacion,
+
+            data:{}
+
+          }));
+
+
+        setDocuments(documentosTransformados);
+
+        console.log(
+          "Documentos transformados aprobador:",
+          documentosTransformados
+        );
+
+
+      } catch(error){
+
+        console.error(
+          'Error cargando documentos:',
+          error
+        );
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    };
+
+
+    cargarDocumentos();
+
+  }, []);
+
+    const pendientes = documents.filter(
+    document =>
+      document.status === 'EN_APROBACION'
+  );
+
+
   return (
     <>
 
       <section className="stats-container">
 
         <div className="stat-card">
-          <span className="stat-icon">📋</span>
+          <span className="stat-icon">📥</span>
 
           <div>
-            <h3>0</h3>
+            <h3>{pendientes.length}</h3>
             <p>Pendientes de aprobación</p>
+          </div>
+
+        </div>
+
+
+        <div className="stat-card">
+          <span className="stat-icon">📄</span>
+
+          <div>
+            <h3>{documents.length}</h3>
+            <p>Documentos recibidos</p>
           </div>
 
         </div>
@@ -1996,45 +2234,79 @@ function ApproverDashboard() {
 
         </div>
 
-
-        <div className="stat-card">
-          <span className="stat-icon">❌</span>
-
-          <div>
-            <h3>0</h3>
-            <p>Rechazados</p>
-          </div>
-
-        </div>
-
       </section>
 
 
       <section className="documents-section">
 
-        <h2>Documentos para aprobación</h2>
+        <h2>
+          Documentos pendientes de aprobación
+        </h2>
 
-        <div className="empty-documents">
 
-          <div className="empty-icon">
-            📋
+        {loading ? (
+
+          <div className="empty-documents">
+            <h3>Cargando documentos...</h3>
           </div>
 
-          <h3>No hay documentos pendientes</h3>
 
-          <p>
-            Los documentos que requieran tu aprobación aparecerán aquí.
-          </p>
+        ) : pendientes.length === 0 ? (
 
-        </div>
+          <div className="empty-documents">
+
+            <div className="empty-icon">
+              📋
+            </div>
+
+            <h3>
+              No hay documentos pendientes
+            </h3>
+
+            <p>
+              Los documentos enviados a aprobación aparecerán aquí.
+            </p>
+
+          </div>
+
+
+        ) : (
+
+          <div className="documents-list">
+
+            {pendientes.map(document => (
+
+              <div
+                className="document-card"
+                key={document.id}
+              >
+
+                <h3>
+                  {document.title}
+                </h3>
+
+                <p>
+                  Tipo: {document.type}
+                </p>
+
+                <p>
+                  Estado: {document.status}
+                </p>
+
+              </div>
+
+            ))}
+
+          </div>
+
+        )}
 
       </section>
 
     </>
   );
 }
-
-
+  
 function AdministratorDashboard() {
   return (
     <>

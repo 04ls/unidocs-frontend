@@ -55,6 +55,79 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
 
+  const handleSendToReview = async (
+    document: Document
+  ) => {
+
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      alert('No hay una sesión activa');
+      return;
+    }
+
+    try {
+
+      const response = await fetch(
+        `http://localhost:3000/documentos/${document.id}/estado`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            estado: 'EN_PROCESO',
+            observacion: 'Documento enviado a revisión'
+          })
+        }
+      );
+
+
+      const data = await response.json();
+
+
+      if (!response.ok) {
+        alert(
+          data.error ||
+          'No se pudo enviar el documento'
+        );
+        return;
+      }
+
+
+      setDocuments(previousDocuments =>
+        previousDocuments.map(doc =>
+          doc.id === document.id
+            ? {
+                ...doc,
+                status: 'EN_PROCESO'
+              }
+            : doc
+        )
+      );
+
+
+      alert(
+        'Documento enviado a revisión correctamente'
+      );
+
+
+    } catch(error){
+
+      console.error(
+        'Error enviando documento:',
+        error
+      );
+
+      alert(
+        'Error de conexión con el servidor'
+      );
+
+    }
+
+  };
+
   const handleLogin = (userData: LoginUser) => {
     console.log('Datos recibidos del login:', userData);
     console.log('Roles recibidos:', userData.roles);
@@ -208,6 +281,7 @@ function App() {
           documents={documents}
           onSaveDocument={handleSaveDocument}
           onUpdateDocument={handleUpdateDocument}
+          onSendToReview={handleSendToReview}
         />
       )}
     </>

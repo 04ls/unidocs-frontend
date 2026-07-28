@@ -28,7 +28,8 @@ function getStatusName(status: Document['status']) {
         BORRADOR: 'Borrador',
         EN_PROCESO: 'En proceso',
         COMPLETADO: 'Completado',
-        RECHAZADO: 'Rechazado'
+        RECHAZADO: 'Rechazado',
+        EN_APROBACION: 'En aprobación'
     };
 
     return statusNames[status];
